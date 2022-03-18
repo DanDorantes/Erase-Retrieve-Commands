@@ -1,0 +1,155 @@
+#!/usr/bin/ksh
+############################################################################
+#                             ITESM - CQ                                   #
+# Objective: Create an erase command that keeps secrete copies of deleted  #
+#            files that allows the user the possibility to recover those   #
+#            deleted files.                                                #
+#                                                                          #
+# This script use four possible flags (-D, -S, -I, or -M) that can be used #
+# only at a time                                                           #
+#                                                                          #
+# Flags:    -D  Deletes permanently all files contained in the directory   #
+#               .Kuka, however it requires a confirmation of the user to   #
+#               proceed with the erasin.                                  #
+#                                                                          #
+#           -S  Displays on screen the list of all files contained in the  #
+#               hidden directory .Kuka.                                    #
+#                                                                          #
+#           -I  For each file in the hidden directory .Kuka, inquiries if  #
+#               the user actually wants to delete the file.                #
+#                                                                          #
+#           -M  Moves the file received as parameter to the hidden         #
+#               directory .Kuka.                                           #
+#                                                                          #
+# Example: $ erase -M filename                                             #
+#                                                                          #
+# Authors: Paula Samantha Casillas Alvarez                                 #
+#          Daniel Dorantes Sánchez                                         #
+#                                                                          #
+# Date: Nov 26 2020                                                        #
+#                                                                          #
+############################################################################
+
+#Validate that the directory .Kuka exist
+if test -d ~/.Kuka
+then
+  echo " "
+else
+  #Create the directory .Kuka and a hidden file that will contain the  paths of the files in .Kuka
+  mkdir ~/.Kuka
+  touch ~/.Kuka/.Paths
+fi
+
+#Validate number of parameters
+if test $# -eq 1
+then
+  Flag=$1
+  #Case to check the flag used
+  case $Flag in
+    -D)
+      #Ask the user if he really wants to delete all files
+      echo "Do you want to delete all files stored in the directory .Kuka? (y/n): \c"
+      read x
+      if test $x == y || test $x == Y
+      then
+        #Create a list of the names of the files in .Kuka including .Paths
+        List=`ls -la ~/.Kuka | egrep -v "total" | tr -s '[ ]' '[#*]' | cut -f9 -d#`
+        for f in `echo $List`
+        do
+          if test $f != .
+          then
+            if test $f != ..
+            then
+              rm ~/.Kuka/$f
+            fi
+          fi
+        done
+        #Create a new hidden file .Paths
+        touch ~/.Kuka/.Paths
+      fi
+      ;;
+    -S)
+      #Create list of the names of all files in .Kuka excluding the file .Paths
+      L=`ls -la ~/.Kuka | egrep -v "total" | tr -s '[ ]' '[#*]' | cut -f9 -d# | egrep -v .Paths`
+      #For loop to print each file of the list L
+      for f in `echo $L`
+      do
+        if test ! -d $f
+        then
+          echo $f
+        fi
+      done
+      ;;
+    -I)
+      #Create list of the names of all files in .Kuka excluding the file .Paths
+      Li=`ls -la ~/.Kuka | egrep -v "total|.Paths" | tr -s '[ ]' '[#*]' | cut -f9 -d#`
+      #Create a temporary file that will contain the paths of the files that were not deleted
+      touch ~/.Kuka/.Temp
+      for f in `echo $Li`
+      do
+        #Check if the variable f is not a directory
+        if test ! -d $f
+        then
+          #Ask if the user wants to delete the file
+          echo "Do you really want to delete the file \"$f\"? (Y/N): \c"
+          read z
+          if test $z == y || test $z == Y
+          then
+             2> /dev/null rm ~/.Kuka/$f
+          else
+            Path=`cat ~/.Kuka/.Paths | grep -w $f`
+            echo $Path >> ~/.Kuka/.Temp
+          fi
+        fi
+      done
+      rm ~/.Kuka/.Paths
+      mv ~/.Kuka/.Temp ~/.Kuka/.Paths
+      ;;
+    *)
+      echo "\nERROR: The flag used is not valid in this script!!!"
+      ;;
+  esac
+elif test $# -eq 2
+then
+  #Validate if the flag is -M
+  if test $1 == -M
+  then
+    #Check if the second parameter is a path or a file
+    Ptest=`echo $2 | egrep /`
+    if test $? -eq 0
+    then
+      DirPath=`dirname $2`
+      #Validar si la ruta existe
+      cd $DirPath
+      if test $? -eq 0
+      then
+        File=`basename $2`
+        #Validate if the file or link exists
+        if  test -f $File || test -h $File || test -L $File
+        then
+          Path=`find $PWD -name $File`
+          mv $Path ~/.Kuka
+          echo "$Path" >> ~/.Kuka/.Paths
+        else
+          echo "\nERROR: the file $2 does not exist."
+        fi
+      else
+        echo "\nERROR: The path $DirPath does not exist!!"
+      fi
+    else
+      #Validate if the second parameter is a file or link that exists in the system
+      if test -f $2 || test -h $2 || test -L $2
+      then
+        Path=`find $PWD -name $2`
+        mv $Path ~/.Kuka
+        echo "$Path" >> ~/.Kuka/.Paths
+      else
+        echo "\nERROR: the file $2 does not exist."
+      fi
+    fi
+  else
+    echo "\nERROR: The flag used is not valid in this script!!!"
+  fi
+else
+  echo "\nERROR: The script must receive the name of the file to be deleted!!!"
+fi

@@ -1,0 +1,91 @@
+#!/usr/bin/ksh
+############################################################################
+#                             ITESM - CQ                                   #
+# Objective: Create an retrieve command that recovers the copies stored in #
+#            the .Kukadirectory of deleted files by erase command and      #
+#            Relocate them in their original directory                     #
+#                                                                          #
+# This script uses two possible flags (-F or -A) used only one at a time   #
+#                                                                          #
+# Flags:    -F  Recovers a file from the hidden directory, receives the    #
+#               file name as a parameter                                   #
+#                                                                          #
+#           -A  Recovers all content in the hidden directory to their      #
+#               original direction, if the original directory no longer    #
+#               exists, it is created again.                               #
+#                                                                          #
+# Example: $ retrieve -A filename                                          #
+#                                                                          #
+# Authors: Paula Samantha Casillas Alvarez                                 #
+#          Daniel Dorantes Sánchez                                        #
+#                                                                          #
+# Date: Nov 25 2020                                                        #
+#                                                                          #
+############################################################################
+
+#Validate that the directory .Kuka exist
+if test -d ~/.Kuka
+then
+  echo " "
+else
+  #Create the directory .Kuka y un archivo oculto que contenga los paths dentro de .Kuka
+  mkdir ~/.Kuka
+  touch ~/.Kuka/.Paths
+fi
+
+if test $# -eq 1
+then
+  #Validate that when only one flag is receives, it is -A
+  if test $1 == -A
+  then
+    #Do the recovery process for each file with a path in .Kuka/.Paths
+    for P in `cat ~/.Kuka/.Paths`
+    do
+      File=`basename $P`
+      Path=`dirname $P`
+      mkdir -p $Path
+      mv ~/.Kuka/$File $Path
+    done
+    #Erase and make new .Kuka/.Paths for clean slate
+    rm ~/.Kuka/.Paths
+    touch  ~/.Kuka/.Paths
+    #Success message
+    echo "\nAll files from the "recycle container" have been removed!!!"
+  elif test $1 == -F
+    then
+    #Insufficient arguments error
+    echo "\nError: The script must receive the name of the file to recover"
+  else
+    #Invalid flag message
+    echo "\nERROR: The flag used is not valid in this script!!!"
+  fi
+elif test $# -eq 2
+then
+  #Validate that when two flags are received, the first flag is -F
+  if test $1 == -F
+  then
+    #Validate that the file exists in the saved paths
+    KukaFile=`cat ~/.Kuka/.Paths |egrep $2`
+    if test $? -eq 0
+    then
+      #Do the recovery process for the file specified
+      Dir=`dirname $KukaFile `
+      mkdir -p $Dir
+      mv ~/.Kuka/$2 $Dir
+      cat ~/.Kuka/.Paths |egrep -v $2 > ~/.Kuka/.Temp
+      cat  ~/.Kuka/.Temp > ~/.Kuka/.Paths
+      rm ~/.Kuka/.Temp
+
+
+    else
+      #Error message
+      echo "\nError: The file \"$2\" does not exist"
+    fi
+  else
+    #Invalid flag message
+    echo "\nERROR: The flag used is not valid in this script!!!"
+  fi
+else
+  #Insufficient flags message
+  echo "\nERROR: The script must receive at least one flag!!!"
+fi
